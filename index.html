@@ -3,222 +3,234 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kiss Collector 💋</title>
+  <title>Kiss Collector Game</title>
   <style>
     body {
       margin: 0;
+      padding: 0;
+      background: pink;
       overflow: hidden;
-      background: #ffe6f0;
       display: flex;
       justify-content: center;
       align-items: center;
       height: 100vh;
-      font-family: Arial, sans-serif;
+      flex-direction: column;
     }
     canvas {
-      background: #ffccdd;
+      border: 2px solid white;
+      background: linear-gradient(to bottom, #ffe6f0, #ffb3d9);
       display: block;
     }
-    #score {
-      position: absolute;
-      top: 10px;
-      left: 50%;
-      transform: translateX(-50%);
-      font-size: 22px;
+    #scoreboard {
+      font-size: 24px;
       font-weight: bold;
-      color: #d63384;
+      color: white;
+      margin: 10px;
+    }
+    #game-over {
+      display: none;
+      font-size: 28px;
+      font-weight: bold;
+      color: red;
+      margin-top: 20px;
+    }
+    #start-btn {
+      margin-bottom: 10px;
+      padding: 10px 20px;
+      font-size: 18px;
+      background: #ff4d79;
+      color: white;
+      border: none;
+      border-radius: 10px;
+      cursor: pointer;
     }
   </style>
 </head>
 <body>
-  <div id="score">Score: 0 / 20</div>
-  <canvas id="gameCanvas"></canvas>
+  <button id="start-btn">Start the game of catching love my dear? 💖</button>
+  <div id="scoreboard">Score: 0</div>
+  <canvas id="gameCanvas" width="400" height="600"></canvas>
+  <div id="game-over">
+    <p id="end-text"></p>
+    <p id="final-score"></p>
+  </div>
+
+  <!-- Background music -->
+  <audio id="bg-music" src="assets/bg.mp3" loop></audio>
+
+  <!-- Kiss sounds -->
+  <audio id="kiss1" src="assets/kiss1.mp3"></audio>
+  <audio id="kiss2" src="assets/kiss2.mp3"></audio>
+  <audio id="kiss3" src="assets/kiss3.mp3"></audio>
 
   <script>
     const canvas = document.getElementById("gameCanvas");
     const ctx = canvas.getContext("2d");
-    canvas.width = window.innerWidth;
-    canvas.height = window.innerHeight;
 
-    // Face images
-    const herFace = new Image();
-    herFace.src = "her.png"; // replace with girlfriend’s face
-    const myFace = new Image();
-    myFace.src = "me.png"; // replace with your face
+    let playerImg = new Image();
+    playerImg.src = "assets/her.png"; // her face
+    let heartImg = new Image();
+    heartImg.src = "assets/him.png"; // your face falling
 
-    let score = 0;
-    let gameOver = false;
-
-    // Player
-    const player = {
-      x: canvas.width / 2 - 50,
-      y: canvas.height - 120,
-      width: 100,
-      height: 100,
-      speed: 8
+    let player = {
+      x: canvas.width/2 - 40,
+      y: canvas.height - 100,
+      width: 80,
+      height: 80,
+      speed: 5
     };
 
-    // Falling kisses
-    const kisses = [];
+    let hearts = [];
+    let score = 0;
+    let gameOver = false;
+    let gameStarted = false;
 
-    function spawnKiss() {
-      kisses.push({
-        x: Math.random() * (canvas.width - 50),
-        y: -50,
-        width: 60,
-        height: 60,
-        speed: 2 + Math.random() * 2
+    // Touch controls
+    let touchX = null;
+
+    document.addEventListener("keydown", (e) => {
+      if(e.key === "ArrowLeft") player.x -= player.speed * 2;
+      if(e.key === "ArrowRight") player.x += player.speed * 2;
+    });
+
+    canvas.addEventListener("touchstart", (e) => {
+      touchX = e.touches[0].clientX;
+    });
+
+    canvas.addEventListener("touchmove", (e) => {
+      let deltaX = e.touches[0].clientX - touchX;
+      player.x += deltaX * 0.3;
+      touchX = e.touches[0].clientX;
+    });
+
+    function spawnHeart(){
+      let size = 50;
+      let x = Math.random() * (canvas.width - size);
+      let y = -size;
+      let speed = 1 + Math.random()*1.5;
+      hearts.push({x,y,size,speed});
+    }
+
+    function drawPlayer(){
+      ctx.drawImage(playerImg, player.x, player.y, player.width, player.height);
+    }
+
+    function drawHearts(){
+      hearts.forEach(h=>{
+        ctx.drawImage(heartImg, h.x, h.y, h.size, h.size);
       });
     }
 
-    setInterval(spawnKiss, 2000); // new kiss every 2 seconds
+    function updateHearts(){
+      for(let i=0;i<hearts.length;i++){
+        hearts[i].y += hearts[i].speed;
+
+        // collision detection
+        if(
+          hearts[i].x < player.x + player.width &&
+          hearts[i].x + hearts[i].size > player.x &&
+          hearts[i].y < player.y + player.height &&
+          hearts[i].y + hearts[i].size > player.y
+        ){
+          score++;
+          document.getElementById("scoreboard").textContent = "Score: " + score;
+
+          // FIXED kiss sound for mobile (clone node each time)
+          const sounds = ["kiss1","kiss2","kiss3"];
+          const soundId = sounds[Math.floor(Math.random()*sounds.length)];
+          const original = document.getElementById(soundId);
+          const kissSound = original.cloneNode(true);
+          kissSound.play().catch(()=>{});
+
+          spawnSparkles(hearts[i].x + hearts[i].size/2, hearts[i].y + hearts[i].size/2);
+
+          hearts.splice(i,1);
+
+          if(score >= 20){
+            gameOver = true;
+            document.getElementById("final-score").textContent = "Final Score: " + score;
+            document.getElementById("end-text").textContent = "You did it! 💖";
+            document.getElementById("game-over").style.display = "block";
+          }
+        }
+      }
+    }
 
     // Sparkles + hearts effect
-    const effects = [];
-    function createEffect(x, y) {
-      for (let i = 0; i < 8; i++) {
-        effects.push({
-          x, y,
-          dx: (Math.random() - 0.5) * 4,
-          dy: (Math.random() - 0.5) * 4,
-          alpha: 1,
-          size: 10 + Math.random() * 8,
-          shape: Math.random() > 0.5 ? "heart" : "sparkle"
+    let particles = [];
+    function spawnSparkles(x,y){
+      for(let i=0;i<10;i++){
+        particles.push({
+          x,y,
+          dx:(Math.random()-0.5)*2,
+          dy:(Math.random()-0.5)*2,
+          life:50,
+          type: Math.random() > 0.5 ? "heart" : "sparkle"
         });
       }
     }
 
-    function drawEffects() {
-      for (let i = effects.length - 1; i >= 0; i--) {
-        const e = effects[i];
-        ctx.globalAlpha = e.alpha;
-
-        if (e.shape === "heart") {
+    function drawParticles(){
+      for(let i=0;i<particles.length;i++){
+        let p = particles[i];
+        ctx.globalAlpha = p.life/50;
+        if(p.type === "heart"){
           ctx.fillStyle = "red";
           ctx.beginPath();
-          ctx.moveTo(e.x, e.y);
-          ctx.bezierCurveTo(e.x - e.size/2, e.y - e.size/2, e.x - e.size, e.y + e.size/3, e.x, e.y + e.size);
-          ctx.bezierCurveTo(e.x + e.size, e.y + e.size/3, e.x + e.size/2, e.y - e.size/2, e.x, e.y);
+          ctx.moveTo(p.x, p.y);
+          ctx.arc(p.x-3, p.y-3, 3, 0, Math.PI*2);
+          ctx.arc(p.x+3, p.y-3, 3, 0, Math.PI*2);
+          ctx.lineTo(p.x, p.y+4);
           ctx.fill();
         } else {
           ctx.fillStyle = "yellow";
           ctx.beginPath();
-          ctx.arc(e.x, e.y, e.size/4, 0, Math.PI*2);
+          ctx.arc(p.x, p.y, 2, 0, Math.PI*2);
           ctx.fill();
         }
-
         ctx.globalAlpha = 1;
-        e.x += e.dx;
-        e.y += e.dy;
-        e.alpha -= 0.02;
-        if (e.alpha <= 0) effects.splice(i, 1);
-      }
-    }
-
-    // 🎵 Web Audio for kiss sounds
-    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-    const kissFiles = ["kiss1.mp3", "kiss2.mp3", "kiss3.mp3"];
-    let kissBuffers = [];
-
-    async function loadSounds() {
-      for (let file of kissFiles) {
-        const resp = await fetch(file);
-        const arrayBuffer = await resp.arrayBuffer();
-        const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-        kissBuffers.push(audioBuffer);
-      }
-    }
-
-    function playKiss() {
-      if (kissBuffers.length === 0) return;
-      const source = audioCtx.createBufferSource();
-      const buf = kissBuffers[Math.floor(Math.random() * kissBuffers.length)];
-      source.buffer = buf;
-      source.connect(audioCtx.destination);
-      source.start();
-    }
-
-    // resume AudioContext after first tap/click (mobile fix)
-    document.body.addEventListener("touchstart", () => {
-      if (audioCtx.state === "suspended") audioCtx.resume();
-    }, { once: true });
-    document.body.addEventListener("mousedown", () => {
-      if (audioCtx.state === "suspended") audioCtx.resume();
-    }, { once: true });
-
-    loadSounds();
-
-    // Controls
-    let keys = {};
-    document.addEventListener("keydown", e => keys[e.key] = true);
-    document.addEventListener("keyup", e => keys[e.key] = false);
-
-    let touchX = null;
-    canvas.addEventListener("touchstart", e => {
-      touchX = e.touches[0].clientX;
-    });
-    canvas.addEventListener("touchmove", e => {
-      touchX = e.touches[0].clientX;
-    });
-    canvas.addEventListener("touchend", () => {
-      touchX = null;
-    });
-
-    function movePlayer() {
-      if (keys["ArrowLeft"]) player.x -= player.speed;
-      if (keys["ArrowRight"]) player.x += player.speed;
-      if (touchX !== null) player.x = touchX - player.width/2;
-
-      if (player.x < 0) player.x = 0;
-      if (player.x + player.width > canvas.width) player.x = canvas.width - player.width;
-    }
-
-    function updateGame() {
-      if (gameOver) return;
-
-      ctx.clearRect(0, 0, canvas.width, canvas.height);
-
-      // draw player
-      ctx.drawImage(herFace, player.x, player.y, player.width, player.height);
-
-      // draw kisses
-      for (let i = kisses.length - 1; i >= 0; i--) {
-        const k = kisses[i];
-        ctx.drawImage(myFace, k.x, k.y, k.width, k.height);
-        k.y += k.speed;
-
-        // collision
-        if (
-          k.x < player.x + player.width &&
-          k.x + k.width > player.x &&
-          k.y < player.y + player.height &&
-          k.y + k.height > player.y
-        ) {
-          score++;
-          document.getElementById("score").innerText = `Score: ${score} / 20`;
-          playKiss();
-          createEffect(k.x + k.width/2, k.y + k.height/2);
-          kisses.splice(i, 1);
-
-          if (score >= 20) {
-            gameOver = true;
-            setTimeout(() => alert("You won! 💖 She collected all kisses!"), 100);
-          }
-        }
-
-        // remove if out of screen (no losing condition here!)
-        if (k.y > canvas.height) {
-          kisses.splice(i, 1);
+        p.x += p.dx;
+        p.y += p.dy;
+        p.life--;
+        if(p.life<=0){
+          particles.splice(i,1);
+          i--;
         }
       }
-
-      drawEffects();
-      movePlayer();
-
-      requestAnimationFrame(updateGame);
     }
 
-    updateGame();
+    function gameLoop(){
+      if(gameOver) return;
+
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      drawPlayer();
+      drawHearts();
+      updateHearts();
+      drawParticles();
+
+      requestAnimationFrame(gameLoop);
+    }
+
+    // Start button
+    document.getElementById("start-btn").addEventListener("click", ()=>{
+      if(!gameStarted){
+        gameStarted = true;
+        gameOver = false;
+        score = 0;
+        document.getElementById("scoreboard").textContent = "Score: 0";
+        document.getElementById("game-over").style.display = "none";
+        hearts = [];
+        particles = [];
+
+        // play bg music at 50% volume
+        const bgMusic = document.getElementById("bg-music");
+        bgMusic.volume = 0.5;
+        bgMusic.play().catch(()=>{});
+
+        setInterval(spawnHeart, 2000);
+        gameLoop();
+      }
+    });
   </script>
 </body>
 </html>
