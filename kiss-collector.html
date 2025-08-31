@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Kiss Collector 💋</title>
+<style>
+  body {
+    margin: 0;
+    overflow: hidden;
+    font-family: "Poppins", sans-serif;
+    background: linear-gradient(to bottom, #ffdde1, #ee9ca7);
+  }
+  #scoreboard {
+    position: absolute;
+    top: 10px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: #d63384;
+    font-size: 24px;
+    font-weight: bold;
+    text-shadow: 1px 1px 3px #fff;
+    z-index: 10;
+  }
+  #game-over {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: none;
+    text-align: center;
+    background: rgba(0,0,0,0.7);
+    color: white;
+    padding: 20px 30px;
+    border-radius: 12px;
+  }
+  #game-over button {
+    margin-top: 15px;
+    padding: 10px 20px;
+    font-size: 18px;
+    border: none;
+    border-radius: 8px;
+    background: #ff4081;
+    color: white;
+    cursor: pointer;
+  }
+  canvas { display: block; }
+</style>
+</head>
+<body>
+
+<div id="scoreboard">Score: 0</div>
+<div id="game-over">
+  <p id="end-text">Game Over! 💖</p>
+  <p>Your final score: <span id="final-score"></span></p>
+  <button onclick="restartGame()">Play Again</button>
+</div>
+
+<canvas id="gameCanvas"></canvas>
+
+<!-- Kiss sounds -->
+<audio id="kiss1" src="assets/kiss1.mp3" preload="auto"></audio>
+<audio id="kiss2" src="assets/kiss2.mp3" preload="auto"></audio>
+<audio id="kiss3" src="assets/kiss3.mp3" preload="auto"></audio>
+
+<!-- Background song -->
+<audio id="bg-music" src="assets/bg-music.mp3" loop preload="auto"></audio>
+
+<script>
+const canvas = document.getElementById("gameCanvas");
+const ctx = canvas.getContext("2d");
+let width = canvas.width = window.innerWidth;
+let height = canvas.height = window.innerHeight;
+
+let score = 0;
+let gameOver = false;
+
+const playerImg = new Image();
+playerImg.src = "assets/her.png";
+
+const heartImg = new Image();
+heartImg.src = "assets/you.png";
+
+const player = {
+  x: width/2 - 40,
+  y: height - 120,
+  width: 80,
+  height: 100,
+  speed: 8
+};
+
+let hearts = [];
+let sparkles = [];
+
+// Background music
+const bgMusic = document.getElementById("bg-music");
+bgMusic.volume = 0.5;
+
+// Start music on first interaction
+function startMusic() {
+    if(bgMusic.paused){
+        const playPromise = bgMusic.play();
+        if(playPromise !== undefined){
+            playPromise.catch(()=>{});
+        }
+    }
+}
+window.addEventListener("click", startMusic, {once:true});
+window.addEventListener("touchstart", startMusic, {once:true});
+window.addEventListener("keydown", startMusic, {once:true});
+
+function spawnHeart() {
+  hearts.push({
+    x: Math.random() * (width - 50),
+    y: -50,
+    size: 50,
+    speed: 1 + Math.random()*1.25
+  });
+}
+
+function drawPlayer() {
+  ctx.drawImage(playerImg, player.x, player.y, player.width, player.height);
+}
+
+function drawHearts() {
+  hearts.forEach(h => ctx.drawImage(heartImg, h.x, h.y, h.size, h.size));
+}
+
+// --- SPARKLES & HEARTS ---
+function spawnSparkles(x, y){
+  for(let j=0;j<10;j++){
+    const isHeart = Math.random() < 0.5;
+    sparkles.push({
+      x: x,
+      y: y,
+      dx: (Math.random()-0.5)*2,
+      dy: (Math.random()-0.5)*2 - 1,
+      size: Math.random()*10 + 6,
+      color: isHeart ? "#ff69b4" : "#fff0f5",
+      life: 40,
+      type: isHeart ? "heart" : "spark"
+    });
+  }
+}
+
+function drawSparkles(){
+  for(let i=sparkles.length-1;i>=0;i--){
+    const p = sparkles[i];
+    ctx.fillStyle = p.color;
+    ctx.save();
+    ctx.translate(p.x, p.y);
+
+    if(p.type === "heart"){
+      ctx.beginPath();
+      const topCurveHeight = p.size * 0.3;
+      ctx.moveTo(0, topCurveHeight);
+      ctx.bezierCurveTo(0, 0, -p.size/2, 0, -p.size/2, topCurveHeight);
+      ctx.bezierCurveTo(-p.size/2, p.size/2, 0, p.size*0.8, 0, p.size);
+      ctx.bezierCurveTo(0, p.size*0.8, p.size/2, p.size/2, p.size/2, topCurveHeight);
+      ctx.bezierCurveTo(p.size/2, 0, 0, 0, 0, topCurveHeight);
+      ctx.fill();
+    } else {
+      ctx.beginPath();
+      ctx.moveTo(0, -p.size/2);
+      for(let s=1; s<=5; s++){
+        const angle = s * (Math.PI*2)/5;
+        const radius = s%2===0 ? p.size/2 : p.size/4;
+        ctx.lineTo(Math.sin(angle)*radius, -Math.cos(angle)*radius);
+      }
+      ctx.closePath();
+      ctx.fill();
+    }
+
+    ctx.restore();
+    p.x += p.dx;
+    p.y += p.dy;
+    p.life--;
+    if(p.life <= 0) sparkles.splice(i,1);
+  }
+}
+
+function updateHearts() {
+  for (let i = hearts.length-1; i>=0; i--) {
+    hearts[i].y += hearts[i].speed;
+
+    if (
+      hearts[i].x < player.x + player.width &&
+      hearts[i].x + hearts[i].size > player.x &&
+      hearts[i].y < player.y + player.height &&
+      hearts[i].y + hearts[i].size > player.y
+    ) {
+      score++;
+      document.getElementById("scoreboard").textContent = "Score: " + score;
+
+      const sounds = ["kiss1","kiss2","kiss3"];
+      const s = document.getElementById(sounds[Math.floor(Math.random()*sounds.length)]);
+      s.currentTime = 0;
+      s.play();
+
+      spawnSparkles(hearts[i].x + hearts[i].size/2, hearts[i].y + hearts[i].size/2);
+
+      hearts.splice(i,1);
+
+      if(score >= 20){
+        gameOver = true;
+        document.getElementById("final-score").textContent = score;
+        document.getElementById("end-text").textContent = "You did it! 💖";
+        document.getElementById("game-over").style.display = "block";
+      }
+    }
+
+    if (hearts[i] && hearts[i].y > height) hearts.splice(i,1);
+  }
+}
+
+function gameLoop() {
+  if (gameOver) return;
+  ctx.clearRect(0,0,width,height);
+  drawPlayer();
+  drawHearts();
+  drawSparkles();
+  updateHearts();
+  requestAnimationFrame(gameLoop);
+}
+
+// Controls
+document.addEventListener("keydown", e => {
+  if(e.key === "ArrowLeft") player.x -= player.speed*2;
+  if(e.key === "ArrowRight") player.x += player.speed*2;
+});
+
+// Touch support
+let touchX = null;
+canvas.addEventListener("touchstart", e => { touchX = e.touches[0].clientX; });
+canvas.addEventListener("touchmove", e => {
+  const currentX = e.touches[0].clientX;
+  player.x += currentX - touchX;
+  touchX = currentX;
+});
+
+function restartGame() {
+  score = 0;
+  hearts = [];
+  sparkles = [];
+  gameOver = false;
+  document.getElementById("scoreboard").textContent = "Score: 0";
+  document.getElementById("end-text").textContent = "Game Over! 💖";
+  document.getElementById("game-over").style.display = "none";
+  gameLoop();
+}
+
+setInterval(() => { if(!gameOver) spawnHeart(); }, 3000);
+
+gameLoop();
+
+window.addEventListener("resize", () => {
+  width = canvas.width = window.innerWidth;
+  height = canvas.height = window.innerHeight;
+  player.y = height - 120;
+});
+</script>
+
+</body>
+</html>
