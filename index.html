@@ -96,18 +96,35 @@ let sparkles = [];
 const bgMusic = document.getElementById("bg-music");
 bgMusic.volume = 0.5;
 
-// Start music on first interaction
-function startMusic() {
-    if(bgMusic.paused){
-        const playPromise = bgMusic.play();
-        if(playPromise !== undefined){
-            playPromise.catch(()=>{});
-        }
-    }
+// Kiss sounds
+const kissSounds = [
+  document.getElementById("kiss1"),
+  document.getElementById("kiss2"),
+  document.getElementById("kiss3")
+];
+
+// --- FIX: unlock sounds on first user gesture ---
+function unlockAudio() {
+  // Try to play all kiss sounds muted to unlock them
+  kissSounds.forEach(s => {
+    s.muted = true;
+    s.play().then(() => {
+      s.pause();
+      s.currentTime = 0;
+      s.muted = false;
+    }).catch(()=>{});
+  });
+
+  // Start background music
+  if(bgMusic.paused){
+    bgMusic.play().catch(()=>{});
+  }
 }
-window.addEventListener("click", startMusic, {once:true});
-window.addEventListener("touchstart", startMusic, {once:true});
-window.addEventListener("keydown", startMusic, {once:true});
+window.addEventListener("click", unlockAudio, {once:true});
+window.addEventListener("touchstart", unlockAudio, {once:true});
+window.addEventListener("keydown", unlockAudio, {once:true});
+
+// ------------------------------------------------
 
 function spawnHeart() {
   hearts.push({
@@ -192,10 +209,10 @@ function updateHearts() {
       score++;
       document.getElementById("scoreboard").textContent = "Score: " + score;
 
-      const sounds = ["kiss1","kiss2","kiss3"];
-      const s = document.getElementById(sounds[Math.floor(Math.random()*sounds.length)]);
+      // Play random kiss sound
+      const s = kissSounds[Math.floor(Math.random()*kissSounds.length)];
       s.currentTime = 0;
-      s.play();
+      s.play().catch(()=>{});
 
       spawnSparkles(hearts[i].x + hearts[i].size/2, hearts[i].y + hearts[i].size/2);
 
@@ -262,3 +279,4 @@ window.addEventListener("resize", () => {
 
 </body>
 </html>
+
